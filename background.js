@@ -1,19 +1,20 @@
 /*global browser*/
+/*jslint es6 */
 
 'use strict';
 
 
 function process_chat_link(link) {
-  link = link.replace('db3pv2.ng.msg.', '')
-  link = link.replace('v1/users/ME', '_#')
-  link += '?ctx=chat'
-  return link
+  link = link.replace('db3pv2.ng.msg.', '');
+  link = link.replace('v1/users/ME', '_#');
+  link += '?ctx=chat';
+  return link;
 }
 
 
 function handle_message(event_message) {
   if (event_message.resourceType && event_message.resourceType == 'NewMessage') {
-    let resource = event_message.resource
+    let resource = event_message.resource;
     if (resource.type == 'Message' &&
       resource.threadtype == 'chat' &&
       resource.messagetype == 'Text'
@@ -23,7 +24,7 @@ function handle_message(event_message) {
         "iconUrl": browser.extension.getURL("images/teams256.png"),
         "title": resource.imdisplayname + (!resource.threadtopic.includes(':orgid:')?' in ' + resource.threadtopic: ''),
         "message": resource.messagetype == 'Text'?resource.content:'...'
-      })
+      });
     }
   }
   // TODO: Handle ConversationUpdate resourceType
@@ -70,7 +71,7 @@ var teams = {
   setTab: function(tab) {
     this.tab = tab;
     browser.browserAction.setIcon({path: 'images/teams38.png'});
-    console.log("Setting tab")
+    console.log("Setting tab");
     browser.webRequest.onBeforeRequest.addListener(
       onPollRequest,
       {
@@ -78,42 +79,43 @@ var teams = {
         urls: ['https://emea.ng.msg.teams.microsoft.com/v1/users/ME/endpoints/SELF/subscriptions/0/poll']
       },
       ['blocking']
-    )
+    );
   },
   selectTab: function() {
-    browser.windows.update(this.tab.windowId, {focused: true})
+    browser.windows.update(this.tab.windowId, {focused: true});
     browser.tabs.update(this.tab.id, {active: true});
-  }
-}
-
-
-function findTeams() {
-  let queryInfo = {url: [teams.url + '/*']};
-  browser.tabs.query(queryInfo, function(tabs) {
-    console.log(tabs)
-    for (let i = 0; i < tabs.length; i++) {
-      let tab = tabs[i];
-      teams.setTab(tab);
+  },
+  findTab: function() {
+    let query_info = {url: [this.url + '/*']};
+    let self = this;
+    browser.tabs.query(query_info, function(tabs) {
+      for (let i = 0; i < tabs.length; i++) {
+        let tab = tabs[i];
+        self.setTab(tab);
+        return;
+      }
+    });
+    if (this.tab === null) this.resetTab();
+  },
+  goTab: function() {
+    if (this.tab !== null) {
+      this.selectTab()
       return;
     }
-  });
-  if (teams.tab === null) teams.resetTab();
-}
-
-
-function goToTeams() {
-  if (teams.tab !== null) {
-    teams.selectTab()
-    return;
+    this.findTab();
+    if (this.tab === null) {
+      let self = this;
+      browser.tabs.create(
+        {url: this.url},
+        function(tab) {self.setTab(tab);}
+      );
+    }
+    else this.selectTab();
+  },
+  goChat: function(link) {
+    this.goTab();
+    browser.tabs.update(teams.tab.id, {url: link});
   }
-  findTeams();
-  if (teams.tab === null) browser.tabs.create({url: teams.url}, function(tab) {teams.setTab(tab);});
-  else teams.selectTab();
-}
-
-function goToTeamsChat(link) {
-  goToTeams();
-  browser.tabs.update(teams.tab.id, {url: link})
 }
 
 function createdCallback(tab) {
@@ -139,14 +141,14 @@ function removedCallback(tab_id, remove_info) {
   }
 }
 
-browser.browserAction.onClicked.addListener(goToTeams);
+browser.browserAction.onClicked.addListener(function() {teams.goTab();});
 browser.runtime.onInstalled.addListener(function() {
   browser.tabs.onCreated.addListener(createdCallback);
   browser.tabs.onRemoved.addListener(removedCallback);
   browser.tabs.onUpdated.addListener(updatedCallback);
 });
-findTeams();
+teams.findTab();
 browser.notifications.onClicked.addListener(function(notification_id) {
   browser.notifications.clear(notification_id);
-  goToTeamsChat(notification_id);
+  teams.goChat(notification_id);
 });
