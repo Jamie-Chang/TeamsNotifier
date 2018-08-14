@@ -79,6 +79,10 @@ var teams = {
       },
       ['blocking']
     )
+  },
+  selectTab: function() {
+    browser.windows.update(this.tab.windowId, {focused: true})
+    browser.tabs.update(this.tab.id, {active: true});
   }
 }
 
@@ -99,12 +103,12 @@ function findTeams() {
 
 function goToTeams() {
   if (teams.tab !== null) {
-    browser.tabs.update(teams.tab.id, {active: true});
+    teams.selectTab()
     return;
   }
   findTeams();
   if (teams.tab === null) browser.tabs.create({url: teams.url}, function(tab) {teams.setTab(tab);});
-  else browser.tabs.update(teams.tab.id, {active: true});
+  else teams.selectTab();
 }
 
 function goToTeamsChat(link) {
