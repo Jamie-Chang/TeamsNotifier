@@ -4,8 +4,10 @@
     "description": "Microsoft Teams notifier extension.",
     "manifest_version": 2,
     "permissions": [
+        "notifications",
         "tabs",
         "webRequest",
+        "webRequestBlocking",
         "https://teams.microsoft.com/*",
         "https://emea.ng.msg.teams.microsoft.com/*"
     ],
