@@ -18,8 +18,6 @@ function handle_message(event_message) {
       resource.threadtype == 'chat' &&
       resource.messagetype == 'Text'
     ){
-      console.log(resource.imdisplayname);
-      console.log(resource.content);
       browser.notifications.create(process_chat_link(resource.conversationLink), {
         "type": "basic",
         "iconUrl": browser.extension.getURL("images/teams256.png"),
@@ -33,10 +31,8 @@ function handle_message(event_message) {
 
 
 function onPollRequest(details) {
-  console.log(details)
   let filter = browser.webRequest.filterResponseData(details.requestId);
   let decoder = new TextDecoder("utf-8");
-  let encoder = new TextEncoder()
   filter.ondata = function(event) {
     try {
       let data = JSON.parse(decoder.decode(event.data, {stream: true}))
@@ -78,7 +74,6 @@ var teams = {
 
 
 function findTeams() {
-  console.log("Finding tabs ...")
   let queryInfo = {url: [teams.url + '/*']};
   browser.tabs.query(queryInfo, function(tabs) {
     console.log(tabs)
