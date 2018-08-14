@@ -23,8 +23,8 @@ function handle_message(event_message) {
       browser.notifications.create(process_chat_link(resource.conversationLink), {
         "type": "basic",
         "iconUrl": browser.extension.getURL("images/teams256.png"),
-        "title": resource.imdisplayname + (resource.threadtopic?' in ' + resource.threadtopic: ''),
-        "message": resource.content
+        "title": resource.imdisplayname + (!resource.threadtopic.includes(':orgid:')?' in ' + resource.threadtopic: ''),
+        "message": resource.messagetype == 'Text'?resource.content:'...'
       })
     }
   }
@@ -130,7 +130,7 @@ function removedCallback(tab_id, remove_info) {
   }
 }
 
-
+browser.browserAction.onClicked.addListener(goToTeams);
 browser.runtime.onInstalled.addListener(function() {
   browser.tabs.onCreated.addListener(createdCallback);
   browser.tabs.onRemoved.addListener(removedCallback);
