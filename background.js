@@ -33,20 +33,30 @@ function handle_message(event_message) {
 function onPollRequest(details) {
   let filter = browser.webRequest.filterResponseData(details.requestId);
   let decoder = new TextDecoder("utf-8");
+  let encoder = new TextEncoder();
+
+  let string_data = '';
   filter.ondata = function(event) {
+    string_data += decoder.decode(event.data, {stream: true});
+  };
+
+  filter.onstop = function(event) {
     try {
-      let data = JSON.parse(decoder.decode(event.data, {stream: true}))
-      if (data.eventMessages) {
-        for (let i = 0; i < data.eventMessages.length; i++) {
-          handle_message(data.eventMessages[i]);
+      console.log(string_data);
+      if (string_data.length > 0) {
+        let json_data = JSON.parse(string_data);
+        if (json_data.eventMessages) {
+          for (let i = 0; i < json_data.eventMessages.length; i++) {
+            handle_message(json_data.eventMessages[i]);
+          }
         }
       }
     }
     finally {
-      filter.write(event.data);
-      filter.disconnect();
+      filter.write(encoder.encode(string_data));
+      filter.close();
     }
-  }
+  };
 }
 
 var teams = {
