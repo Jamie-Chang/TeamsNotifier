@@ -50,7 +50,9 @@ function handle_message(event_message) {
     if (resource.type != 'Message') return;
     if (!resource.content) return;
     console.log("checking if teams tab focused");
-    getFocusedTab((tab) => {}, () => createNotification(resource));
+    checkFocused(teams.url + '/*').then((isFocused) => {
+      if (!isFocused) createNotification(resource);
+    });
   }
 }
 
@@ -82,6 +84,26 @@ function onPollRequest(details) {
       filter.close();
     }
   };
+}
+
+function checkFocused(urlPattern) {
+  return new Promise(
+      (resolve, reject) => {
+          browser.windows.getLastFocused().then(
+              (window) => {
+                  if (!window.focused) resolve(false);
+                  let query_info = {
+                      url: [urlPattern],
+                      active: true,
+                      windowId: window.id
+                  };
+                  browser.tabs.query(query_info).then(
+                      (tabs) => {resolve(tabs.length == 1);}
+                  );
+              }
+          );
+      }
+  )
 }
 
 var teams = {
@@ -147,28 +169,6 @@ function createdCallback(tab) {
   if (teams.tab === null && tab.url.startsWith(teams.url)) {
     teams.setTab(tab);
   }
-}
-
-
-function getFocusedTab(callback, notfoundCallback) {
-  let getting = browser.windows.getLastFocused();
-  getting.then(
-    function(window) {
-      console.log(window);
-      if (window.focused){
-        let querying = browser.tabs.query({
-          url: [teams.url + '/*'],
-          active: true,
-          windowId: window.id
-        });
-        querying.then(function(tabs) {
-          console.log(tabs);
-          if (tabs.length == 1) callback(tabs[0]);
-          else notfoundCallback();
-        });
-      }
-      else notfoundCallback();
-    });
 }
 
 
