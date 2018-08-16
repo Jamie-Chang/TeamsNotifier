@@ -126,7 +126,7 @@ function goToTeams() {
 }
 
 function goToTeamsChat(link) {
-  browser.tabs.update(teams.tab.id, {url: link})
+  browser.tabs.update(teams.tab.id, {url: link, loadReplace: true})
   goToTeams();
 }
 
