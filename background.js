@@ -26,7 +26,11 @@ function handle_message(event_message) {
     let resource = event_message.resource;
     if (resource.type != 'Message') return;
     let link = null;
-    if (resource.threadtype == 'chat') link = process_chat_link(resource.conversationLink);
+    if (resource.threadtype == 'chat') {
+      link = process_chat_link(resource.conversationLink);
+      let focusedTab = getFocusedTab();
+      if (focusedTab && focusedTab.url == link) return;
+    }
     else if (resource.threadtype == 'topic') {
       link = process_topic_link(
         resource.conversationLink, resource.threadtopic, resource.id);
@@ -134,6 +138,26 @@ function createdCallback(tab) {
   if (teams.tab === null && tab.url.startsWith(teams.url)) {
     teams.setTab(tab);
   }
+}
+
+
+function getFocusedTab() {
+  let getting = browser.windows.getLastFocused();
+  let tab = null;
+  getting.then(
+    function(window) {
+      if (window.focused){
+        let querying = browser.tabs.query({
+          url: [teams.url + '/*'],
+          active: true,
+          windowId: window.id
+        });
+        querying.then(function(tabs) {
+          if (tabs.length == 1) tab = tabs[0];
+        })
+      }
+    });
+  return tab;
 }
 
 
