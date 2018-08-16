@@ -12,6 +12,7 @@ function process_chat_link(link) {
 }
 
 function process_topic_link(link, threadtopic, messageId) {
+  link = link.split(';messageid', 1)[0]
   link = link.replace('db3pv2.ng.msg.', '');
   link = link.replace('v1/users/ME', '_#');
   link = link.replace('_#/conversations/', '_#/conversations/' + threadtopic + '?threadId=');
@@ -21,27 +22,35 @@ function process_topic_link(link, threadtopic, messageId) {
 }
 
 
+function createNotification(resource) {
+  let link = null;
+  let threadtopic = resource.threadtopic || 'unknown';
+  if (resource.threadtype == 'chat') {
+    link = process_chat_link(resource.conversationLink);
+  }
+  else if (resource.threadtype == 'topic' || resource.threadtype == 'space') {
+    link = process_topic_link(
+      resource.conversationLink, threadtopic, resource.id
+    );
+    console.log(link);
+  }
+  else return;
+  browser.notifications.create(link, {
+    type: "basic",
+    iconUrl: browser.extension.getURL("images/teams256.png"),
+    title: resource.imdisplayname + (!threadtopic.includes(':orgid:')?' in ' + threadtopic: ''),
+    message: resource.messagetype == 'Text'?resource.content:'New ' + resource.messagetype + ' message'
+  });
+}
+
+
 function handle_message(event_message) {
   if (event_message.resourceType && event_message.resourceType == 'NewMessage') {
     let resource = event_message.resource;
     if (resource.type != 'Message') return;
-    let link = null;
-    if (resource.threadtype == 'chat') {
-      link = process_chat_link(resource.conversationLink);
-      let focusedTab = getFocusedTab();
-      if (focusedTab && focusedTab.url == link) return;
-    }
-    else if (resource.threadtype == 'topic') {
-      link = process_topic_link(
-        resource.conversationLink, resource.threadtopic, resource.id);
-    }
-    else return;
-    browser.notifications.create(link, {
-      type: "basic",
-      iconUrl: browser.extension.getURL("images/teams256.png"),
-      title: resource.imdisplayname + (!resource.threadtopic.includes(':orgid:')?' in ' + resource.threadtopic: ''),
-      message: resource.messagetype == 'Text'?resource.content:'New ' + resource.messagetype + ' message'
-    });
+    if (!resource.content) return;
+    console.log("checking if teams tab focused");
+    getFocusedTab((tab) => {}, () => createNotification(resource));
   }
 }
 
@@ -141,11 +150,11 @@ function createdCallback(tab) {
 }
 
 
-function getFocusedTab() {
+function getFocusedTab(callback, notfoundCallback) {
   let getting = browser.windows.getLastFocused();
-  let tab = null;
   getting.then(
     function(window) {
+      console.log(window);
       if (window.focused){
         let querying = browser.tabs.query({
           url: [teams.url + '/*'],
@@ -153,11 +162,13 @@ function getFocusedTab() {
           windowId: window.id
         });
         querying.then(function(tabs) {
-          if (tabs.length == 1) tab = tabs[0];
-        })
+          console.log(tabs);
+          if (tabs.length == 1) callback(tabs[0]);
+          else notfoundCallback();
+        });
       }
+      else notfoundCallback();
     });
-  return tab;
 }
 
 
