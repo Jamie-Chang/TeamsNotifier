@@ -3,6 +3,8 @@
 
 'use strict';
 
+let teamsUrl = 'https://teams.microsoft.com';
+let pollUrl = 'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/endpoints/SELF/subscriptions/0/poll';
 
 function process_chat_link(link) {
   link = link.replace('db3pv2.ng.msg.', '');
@@ -44,47 +46,18 @@ function createNotification(resource) {
 }
 
 
-function handle_message(event_message) {
+function handleMessage(event_message) {
   if (event_message.resourceType && event_message.resourceType == 'NewMessage') {
     let resource = event_message.resource;
     if (resource.type != 'Message') return;
     if (!resource.content) return;
     console.log("checking if teams tab focused");
-    checkFocused(teams.url + '/*').then((isFocused) => {
+    checkFocused(teamsUrl + '/*').then((isFocused) => {
       if (!isFocused) createNotification(resource);
     });
   }
 }
 
-
-function onPollRequest(details) {
-  let filter = browser.webRequest.filterResponseData(details.requestId);
-  let decoder = new TextDecoder("utf-8");
-  let encoder = new TextEncoder();
-
-  let string_data = '';
-  filter.ondata = function(event) {
-    string_data += decoder.decode(event.data, {stream: true});
-  };
-
-  filter.onstop = function(event) {
-    try {
-      console.log(string_data);
-      if (string_data.length > 0) {
-        let json_data = JSON.parse(string_data);
-        if (json_data.eventMessages) {
-          for (let i = 0; i < json_data.eventMessages.length; i++) {
-            handle_message(json_data.eventMessages[i]);
-          }
-        }
-      }
-    }
-    finally {
-      filter.write(encoder.encode(string_data));
-      filter.close();
-    }
-  };
-}
 
 function checkFocused(urlPattern) {
   return new Promise(
@@ -106,100 +79,84 @@ function checkFocused(urlPattern) {
   )
 }
 
-var teams = {
-  tab: null,
-  url: 'https://teams.microsoft.com',
-  resetTab: function() {
-    this.tab = null;
-    browser.browserAction.setIcon({path: 'images/teamsgrey38.png'});
-    browser.webRequest.onBeforeRequest.removeListener(onPollRequest);
-  },
-  setTab: function(tab) {
-    this.tab = tab;
-    browser.browserAction.setIcon({path: 'images/teams38.png'});
-    console.log("Setting tab")
-    browser.webRequest.onBeforeRequest.addListener(
-      onPollRequest,
-      {
-        tabId: this.tab.id,
-        urls: ['https://emea.ng.msg.teams.microsoft.com/v1/users/ME/endpoints/SELF/subscriptions/0/poll']
-      },
-      ['blocking']
-    )
-  },
-  selectTab: function() {
-    browser.windows.update(this.tab.windowId, {focused: true})
-    browser.tabs.update(this.tab.id, {active: true});
+
+function onPoll(details) {
+  let tab_id = details.tabId;
+  if (tab_id == -1) { // Not originated from a browser TAB.
+    return; // Skip if that's the case.
   }
-}
+  let filter = browser.webRequest.filterResponseData(details.requestId);
+  let decoder = new TextDecoder("utf-8");
+  let encoder = new TextEncoder();
 
+  let string_data = '';
+  filter.ondata = (event) => {
+    string_data += decoder.decode(event.data, {stream: true});
+  };
 
-function findTeams(skipTabId) {
-  skipTabId =  (arguments.length == 1?skipTabId:null)
-  let queryInfo = {url: [teams.url + '/*']};
-  browser.tabs.query(queryInfo, function(tabs) {
-    console.log(tabs)
-    for (let i = 0; i < tabs.length; i++) {
-      if (tabs[i].id != skipTabId) {
-        teams.setTab(tabs[i]);
-        return;
+  filter.onstop = (event) => {
+    try {
+      console.log(string_data);
+      if (string_data.length > 0) {
+        let json_data = JSON.parse(string_data);
+        if (json_data.eventMessages) {
+          for (let i = 0; i < json_data.eventMessages.length; i++) {
+            handleMessage(json_data.eventMessages[i]);
+          }
+        }
       }
     }
-  });
-  if (teams.tab === null) teams.resetTab();
-}
+    finally {
+      filter.write(encoder.encode(string_data));
+      filter.close();
+    }
+  };
 
+}
 
 function goToTeams() {
-  if (teams.tab !== null) {
-    teams.selectTab()
-    return;
-  }
-  findTeams();
-  if (teams.tab === null) browser.tabs.create({url: teams.url}, function(tab) {teams.setTab(tab);});
-  else teams.selectTab();
-}
-
-function goToTeamsChat(link) {
-  browser.tabs.update(teams.tab.id, {url: link, loadReplace: true})
-  goToTeams();
-}
-
-function createdCallback(tab) {
-  if (teams.tab === null && tab.url.startsWith(teams.url)) {
-    teams.setTab(tab);
-  }
-}
-
-
-function updatedCallback(tab_id, change_info, tab) {
-  if (teams.tab !== null && tab.id === teams.tab.id) {
-    // Teams tab changed URL
-    teams.tab = tab;
-    if (change_info.url && !change_info.url.startsWith(teams.url)) {
-      // Teams tab URL changed
-      teams.resetTab();
-      findTeams();
+  return new Promise(
+    (resolve, reject) => {
+      console.log("Navigating to teams tab.");
+      browser.tabs.query({url: [teamsUrl + '/*']}).then(
+        (tabs) => tabs[0]
+      ).then(
+        (tab) => {
+          if (tab) {
+            browser.tabs.update(tab.id, {active: true}).then(resolve);
+          } else {
+            browser.tabs.create({url: teamsUrl}).then(resolve);
+          }
+        }
+      );
     }
-  } else createdCallback(tab);
+  )
+}
+
+function goToTeamsURL(url) {
+  return new Promise(
+    (resolve, reject) => {
+      goToTeams().then(
+        (tab) => {
+          browser.tabs.update(
+            tab.id, {url: notificationId, loadReplace: true}
+          ).then(resolve)
+        }
+      );
+    }
+  )
 }
 
 
-function removedCallback(tab_id, remove_info) {
-  if (teams.tab !== null && teams.tab.id == tab_id) {
-    teams.resetTab();
-    findTeams(tab_id);
-  }
-}
-
-browser.browserAction.onClicked.addListener(goToTeams);
-browser.runtime.onInstalled.addListener(function() {
-  browser.tabs.onCreated.addListener(createdCallback);
-  browser.tabs.onRemoved.addListener(removedCallback);
-  browser.tabs.onUpdated.addListener(updatedCallback);
-  findTeams();
-});
-browser.notifications.onClicked.addListener(function(notification_id) {
-  browser.notifications.clear(notification_id);
-  goToTeamsChat(notification_id);
+browser.runtime.onInstalled.addListener(() => {
+  browser.browserAction.onClicked.addListener(goToTeams);
+  browser.notifications.onClicked.addListener(function(notificationId) {
+    browser.notifications.clear(notificationId);
+    goToTeamsURL(notificationId);
+  });
+  browser.webRequest.onBeforeRequest.addListener(
+    onPoll,
+    {urls: [pollUrl]},
+    ['blocking']
+  )
 });
