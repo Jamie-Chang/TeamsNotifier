@@ -138,8 +138,9 @@ function goToTeamsURL(url) {
     (resolve, reject) => {
       goToTeams().then(
         (tab) => {
+          console.log(tab);
           browser.tabs.update(
-            tab.id, {url: notificationId, loadReplace: true}
+            tab.id, {url: url, loadReplace: true}
           ).then(resolve)
         }
       );
