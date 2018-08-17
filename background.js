@@ -123,7 +123,11 @@ function goToTeams() {
       ).then(
         (tab) => {
           if (tab) {
-            browser.tabs.update(tab.id, {active: true}).then(resolve);
+            browser.windows.update(tab.windowId, {focused: true}).then(
+              (window) => {
+                browser.tabs.update(tab.id, {active: true}).then(resolve);
+              }
+            );
           } else {
             browser.tabs.create({url: teamsUrl}).then(resolve);
           }
