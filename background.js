@@ -111,10 +111,9 @@ function onPoll(details) {
       filter.close();
     }
   };
-
 }
 
-function goToTeams() {
+function findTeams() {
   return new Promise(
     (resolve, reject) => {
       console.log("Navigating to teams tab.");
@@ -123,39 +122,49 @@ function goToTeams() {
       ).then(
         (tab) => {
           if (tab) {
-            browser.windows.update(tab.windowId, {focused: true}).then(
-              (window) => {
-                browser.tabs.update(tab.id, {active: true}).then(resolve);
-              }
-            );
+            resolve(tab);
           } else {
-            browser.tabs.create({url: teamsUrl}).then(resolve);
+            browser.tabs.create({url: teamsUrl, active:false}).then(resolve);
           }
+        }
+      );
+    }
+  );
+}
+
+function highlightTab(tab) {
+  return new Promise(
+    (resolve, reject) => {
+      console.log(tab);
+      browser.windows.update(tab.windowId, {focused: true}).then(
+        (window) => {
+          browser.tabs.update(tab.id, {active: true}).then(resolve);
         }
       );
     }
   )
 }
 
+
 function goToTeamsURL(url) {
   return new Promise(
     (resolve, reject) => {
-      goToTeams().then(
+      findTeams().then(
         (tab) => {
           console.log(tab);
           browser.tabs.update(
             tab.id, {url: url, loadReplace: true}
-          ).then(resolve)
+          ).then(highlightTab);
         }
-      );
+      )
     }
   )
 }
 
 
 browser.runtime.onInstalled.addListener(() => {
-  browser.browserAction.onClicked.addListener(goToTeams);
-  browser.notifications.onClicked.addListener(function(notificationId) {
+  browser.browserAction.onClicked.addListener(() => findTeams().then(highlightTab));
+  browser.notifications.onClicked.addListener((notificationId) => {
     browser.notifications.clear(notificationId);
     goToTeamsURL(notificationId);
   });
