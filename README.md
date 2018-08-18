@@ -11,4 +11,5 @@ This project originally started as a chrome extension, unfortunately chrome's AP
 * ~~Focus window when clicking on notification or icon.~~
 * ~~Handle larger messages properly.~~
 * ~~Show notifications for channels.~~
-* Only show notifications for followed channels.
+* ~~Only show notifications for followed channels.~~
+* Handle uncommon message types: Likes, mentions etc.
