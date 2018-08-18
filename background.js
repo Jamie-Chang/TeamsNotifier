@@ -6,54 +6,93 @@
 let teamsUrl = 'https://teams.microsoft.com';
 let pollUrl = 'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/endpoints/SELF/subscriptions/0/poll';
 
-function process_chat_link(link) {
-  link = link.replace('db3pv2.ng.msg.', '');
-  link = link.replace('v1/users/ME', '_#');
-  link += '?ctx=chat';
-  return link;
+function stripTags(html, defaultMsg) {
+  let doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent||defaultMsg;
 }
 
-function process_topic_link(link, threadtopic, messageId) {
-  link = link.split(';messageid', 1)[0]
-  link = link.replace('db3pv2.ng.msg.', '');
-  link = link.replace('v1/users/ME', '_#');
-  link = link.replace('_#/conversations/', '_#/conversations/' + threadtopic + '?threadId=');
-  link += '&ctx=channel';
-  link += ('&messageId=' + messageId);
-  return link;
+function getChatLink(conversationLink) {
+  return conversationLink.replace(
+    'db3pv2.ng.msg.', ''
+  ).replace(
+    'v1/users/ME', '_#'
+  ) + '?ctx=chat';
 }
 
+function getTopicLink(conversationLink, threadtopic, messageId) {
+  return conversationLink.split(
+    ';messageid', 1
+  )[0].replace(
+    'db3pv2.ng.msg.', ''
+  ).replace(
+    'v1/users/ME', '_#'
+  ).replace(
+    '_#/conversations/', '_#/conversations/' + threadtopic + '?threadId='
+  ) + '&ctx=channel&messageId=' + messageId;
+}
 
-function createNotification(resource) {
-  let link = null;
-  let threadtopic = resource.threadtopic || 'unknown';
+function getLink(resource) {
+  resource.threadtopic = resource.threadtopic || 'unknown';
   if (resource.threadtype == 'chat') {
-    link = process_chat_link(resource.conversationLink);
+    return getChatLink(resource.conversationLink);
   }
-  else if (resource.threadtype == 'topic' || resource.threadtype == 'space') {
-    link = process_topic_link(
-      resource.conversationLink, threadtopic, resource.id
+  if (resource.threadtype == 'topic' || resource.threadtype == 'space') {
+    return getTopicLink(
+      resource.conversationLink, resource.threadtopic, resource.id
     );
-    console.log(link);
   }
-  else return;
-  browser.notifications.create(link, {
-    type: "basic",
-    iconUrl: browser.extension.getURL("images/teams256.png"),
-    title: resource.imdisplayname + (!threadtopic.includes(':orgid:')?' in ' + threadtopic: ''),
-    message: resource.messagetype == 'Text'?resource.content:'New ' + resource.messagetype + ' message'
-  });
+  return null;
+}
+
+
+function createNotification(link, resource) {
+  console.log("Creating notification:");
+  let notification_props = {
+    type: 'basic',
+    iconUrl: browser.extension.getURL("images/teams256.png")
+  };
+
+  notification_props.title = ((resource) => {
+    // Message from unnamed chat.
+    if (resource.threadtopic.includes(':orgid:')) return resource.imdisplayname;
+
+    // Reply from channel.
+    if (resource.threadtype == 'space') return resource.imdisplayname + ' reply';
+
+    // Named group chat or channel chat.
+    return resource.imdisplayname + ' in ' + resource.threadtopic;
+  }) (resource);
+
+  notification_props.message = ((resource) => {
+    let default_msg = 'New message';
+    switch(resource.messagetype) {
+      case 'Text':
+        return resource.content;
+      case 'RichText/Html':
+        return stripTags(resource.content, default_msg);
+      default:
+        return default_msg;
+    }
+  }) (resource);
+
+  console.log(notification_props);
+  return browser.notifications.create(link, notification_props);
 }
 
 
 function handleMessage(event_message) {
   if (event_message.resourceType && event_message.resourceType == 'NewMessage') {
     let resource = event_message.resource;
-    if (resource.type != 'Message') return;
-    if (!resource.content) return;
-    console.log("checking if teams tab focused");
+    if (resource.type != 'Message' || !resource.content) {
+      // Not a message or no content
+      return;
+    }
     checkFocused(teamsUrl + '/*').then((isFocused) => {
-      if (!isFocused) createNotification(resource);
+      resource.threadtopic = resource.threadtopic || 'unknown';
+      let link = getLink(resource);
+      if (link && !isFocused) {
+        createNotification(link, resource).then(console.log);
+      }
     });
   }
 }
@@ -61,21 +100,21 @@ function handleMessage(event_message) {
 
 function checkFocused(urlPattern) {
   return new Promise(
-      (resolve, reject) => {
-          browser.windows.getLastFocused().then(
-              (window) => {
-                  if (!window.focused) resolve(false);
-                  let query_info = {
-                      url: [urlPattern],
-                      active: true,
-                      windowId: window.id
-                  };
-                  browser.tabs.query(query_info).then(
-                      (tabs) => {resolve(tabs.length == 1);}
-                  );
-              }
+    (resolve, reject) => {
+      browser.windows.getLastFocused().then(
+        (window) => {
+          if (!window.focused) resolve(false);
+          let query_info = {
+            url: [urlPattern],
+            active: true,
+            windowId: window.id
+          };
+          browser.tabs.query(query_info).then(
+            (tabs) => {resolve(tabs.length == 1);}
           );
-      }
+        }
+      );
+    }
   )
 }
 
