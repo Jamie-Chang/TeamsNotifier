@@ -193,11 +193,11 @@ function goToTeamsURL(url) {
           console.log(tab);
           browser.tabs.update(
             tab.id, {url: url, loadReplace: true}
-          ).then(highlightTab);
+          ).then(highlightTab).then(resolve);
         }
-      )
+      );
     }
-  )
+  );
 }
 
 
