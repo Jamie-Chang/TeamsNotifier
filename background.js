@@ -5,6 +5,7 @@
 
 let teamsUrl = 'https://teams.microsoft.com';
 let pollUrl = 'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/endpoints/SELF/subscriptions/0/poll';
+let messageManager = new Conditions();
 
 function stripTags(html, defaultMsg) {
   let doc = new DOMParser().parseFromString(html, 'text/html');
@@ -81,19 +82,43 @@ function createNotification(link, resource) {
 
 
 function handleMessage(event_message) {
+  let fireNotification = (link, resource) => checkFocused(teamsUrl + '/*').then(
+    (isFocused) => {
+      if (!isFocused) {
+        createNotification(link, resource).then(console.log);
+      }
+   }
+  );
+
   if (event_message.resourceType && event_message.resourceType == 'NewMessage') {
     let resource = event_message.resource;
-    if (resource.type != 'Message' || !resource.content) {
+    if (resource.type != 'Message') {
       // Not a message or no content
       return;
     }
-    checkFocused(teamsUrl + '/*').then((isFocused) => {
+    let link = getLink(resource);
+    if (link && resource.content) {
       resource.threadtopic = resource.threadtopic || 'unknown';
-      let link = getLink(resource);
-      if (link && !isFocused) {
-        createNotification(link, resource).then(console.log);
+      if (resource.threadtype == 'topic') {
+        messageManager.wait(resource.id, 2000).then(
+          (message) => {fireNotification(link, resource)},
+          console.log
+        )
       }
-    });
+      else {
+        fireNotification(link, resource);
+      }
+    }
+    else if (resource.properties && resource.properties.activity) {
+      let activity = resource.properties.activity;
+      if (activity.activityType == 'follow' &&
+      activity.activitySubtype == 'channelNewMessage') {
+        messageManager.notify(activity.sourceMessageId).then(
+          console.log,
+          console.log
+        )
+      }
+    }
   }
 }
 
