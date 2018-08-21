@@ -226,15 +226,13 @@ function goToTeamsURL(url) {
 }
 
 
-browser.runtime.onInstalled.addListener(() => {
-  browser.browserAction.onClicked.addListener(() => findTeams().then(highlightTab));
-  browser.notifications.onClicked.addListener((notificationId) => {
-    browser.notifications.clear(notificationId);
-    goToTeamsURL(notificationId);
-  });
-  browser.webRequest.onBeforeRequest.addListener(
-    onPoll,
-    {urls: [pollUrl]},
-    ['blocking']
-  )
+browser.browserAction.onClicked.addListener(() => findTeams().then(highlightTab));
+browser.notifications.onClicked.addListener((notificationId) => {
+  browser.notifications.clear(notificationId);
+  goToTeamsURL(notificationId);
 });
+browser.webRequest.onBeforeRequest.addListener(
+  onPoll,
+  {urls: [pollUrl]},
+  ['blocking']
+)
