@@ -60,6 +60,11 @@ function createNotification(link, resource) {
     // Reply from channel.
     if (resource.threadtype == 'space') return resource.imdisplayname + ' reply';
 
+    // Mention in channel chat
+    if (resource.properties.mentions) {
+      return resource.imdisplayname + ' mentioned you in ' + resource.threadtopic;
+    }
+
     // Named group chat or channel chat.
     return resource.imdisplayname + ' in ' + resource.threadtopic;
   }) (resource);
@@ -111,8 +116,12 @@ function handleMessage(event_message) {
     }
     else if (resource.properties && resource.properties.activity) {
       let activity = resource.properties.activity;
-      if (activity.activityType == 'follow' &&
-      activity.activitySubtype == 'channelNewMessage') {
+      if (
+        ( activity.activityType == 'follow' &&
+          activity.activitySubtype == 'channelNewMessage') ||
+        ( activity.activityType == 'mention' &&
+        activity.activitySubtype == 'person')
+      ) {
         messageManager.notify(activity.sourceMessageId).then(
           console.log,
           console.log
