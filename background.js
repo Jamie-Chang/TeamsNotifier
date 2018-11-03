@@ -46,7 +46,7 @@ function getLink(resource) {
 }
 
 
-function createNotification(link, resource) {
+async function createNotification(link, resource) {
   console.log("Creating notification:");
   let notification_props = {
     type: 'basic',
@@ -82,18 +82,16 @@ function createNotification(link, resource) {
   }) (resource);
 
   console.log(notification_props);
-  return browser.notifications.create(link, notification_props);
+  return await browser.notifications.create(link, notification_props);
 }
 
 
-function handleMessage(event_message) {
-  let fireNotification = (link, resource) => checkFocused(teamsUrl + '/*').then(
-    (isFocused) => {
-      if (!isFocused) {
-        createNotification(link, resource).then(console.log);
-      }
-   }
-  );
+async function handleMessage(event_message) {
+  async function fireNotification(link, resource) {
+    if (! await checkFocused(teamsUrl + '/*')) {
+      console.log(await createNotification(link, resource));
+    }
+  }
 
   if (event_message.resourceType && event_message.resourceType == 'NewMessage') {
     let resource = event_message.resource;
@@ -105,13 +103,16 @@ function handleMessage(event_message) {
     if (link && resource.content) {
       resource.threadtopic = resource.threadtopic || 'unknown';
       if (resource.threadtype == 'topic') {
-        messageManager.wait(resource.id, 2000).then(
-          (message) => {fireNotification(link, resource)},
-          console.log
-        )
+        try {
+          await messageManager.wait(resource.id, 2000)
+        }
+        catch (e) {
+          console.log(e)
+        }
+        await fireNotification(link, resource);
       }
       else {
-        fireNotification(link, resource);
+        await fireNotification(link, resource);
       }
     }
     else if (resource.properties && resource.properties.activity) {
@@ -122,34 +123,29 @@ function handleMessage(event_message) {
         ( activity.activityType == 'mention' &&
         activity.activitySubtype == 'person')
       ) {
-        messageManager.notify(activity.sourceMessageId).then(
-          console.log,
-          console.log
-        )
+        try {
+          message = await messageManager.notify(activity.sourceMessageId)
+          console.log(message)
+        }
+        catch (e) {
+          console.error(e)
+        }
       }
     }
   }
 }
 
 
-function checkFocused(urlPattern) {
-  return new Promise(
-    (resolve, reject) => {
-      browser.windows.getLastFocused().then(
-        (window) => {
-          if (!window.focused) resolve(false);
-          let query_info = {
-            url: [urlPattern],
-            active: true,
-            windowId: window.id
-          };
-          browser.tabs.query(query_info).then(
-            (tabs) => {resolve(tabs.length == 1);}
-          );
-        }
-      );
-    }
-  )
+async function checkFocused(urlPattern) {
+  let window = await browser.windows.getLastFocused();
+  if (!window.focused) return false;
+  let query_info = {
+    url: [urlPattern],
+    active: true,
+    windowId: window.id
+  };
+  let tabs = await browser.tabs.query(query_info);
+  return tabs.length == 1;
 }
 
 
@@ -186,52 +182,28 @@ function onPoll(details) {
   };
 }
 
-function findTeams() {
-  return new Promise(
-    (resolve, reject) => {
-      console.log("Navigating to teams tab.");
-      browser.tabs.query({url: [teamsUrl + '/*']}).then(
-        (tabs) => tabs[0]
-      ).then(
-        (tab) => {
-          if (tab) {
-            resolve(tab);
-          } else {
-            browser.tabs.create({url: teamsUrl, active:false}).then(resolve);
-          }
-        }
-      );
-    }
-  );
+async function findTeams() {
+  console.log("Navigating to teams tab.");
+  let tabs = await browser.tabs.query({url: [teamsUrl + '/*']})
+  if (tabs[0]) {
+    return tabs[0];
+  } else {
+    return await browser.tabs.create({url: teamsUrl, active:false});
+  }
 }
 
-function highlightTab(tab) {
-  return new Promise(
-    (resolve, reject) => {
-      console.log(tab);
-      browser.windows.update(tab.windowId, {focused: true}).then(
-        (window) => {
-          browser.tabs.update(tab.id, {active: true}).then(resolve);
-        }
-      );
-    }
-  )
+async function highlightTab(tab) {
+  console.log(tab);
+  await browser.windows.update(tab.windowId, {focused: true})
+  return await browser.tabs.update(tab.id, {active: true})
 }
 
 
-function goToTeamsURL(url) {
-  return new Promise(
-    (resolve, reject) => {
-      findTeams().then(
-        (tab) => {
-          console.log(tab);
-          browser.tabs.update(
-            tab.id, {url: url, loadReplace: true}
-          ).then(highlightTab).then(resolve);
-        }
-      );
-    }
-  );
+async function goToTeamsURL(url) {
+  let tab = await findTeams()
+  console.log(tab);
+  tab = await browser.tabs.update(tab.id, {url: url, loadReplace: true});
+  return await highlightTab(tab);
 }
 
 
