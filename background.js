@@ -4,7 +4,7 @@
 'use strict';
 
 let teamsUrl = 'https://teams.microsoft.com';
-let pollUrl = 'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/endpoints/SELF/subscriptions/0/poll';
+let pollUrl = 'https://*.teams.microsoft.com/*/poll';
 let messageManager = new Conditions();
 
 function stripTags(html, defaultMsg) {

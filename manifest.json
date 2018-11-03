@@ -8,8 +8,7 @@
         "tabs",
         "webRequest",
         "webRequestBlocking",
-        "https://teams.microsoft.com/*",
-        "https://emea.ng.msg.teams.microsoft.com/*"
+        "https://*.teams.microsoft.com/*"
     ],
     "background": {
         "scripts": ["util.js", "background.js"]
