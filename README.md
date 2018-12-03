@@ -1,6 +1,9 @@
 # TeamsNotifier
 A Firefox extension to send notifications for new messages in MS Teams.
 
+## Update
+Notifications has officially been implemented.
+
 ## Why do I need this?
 The web app for Microsoft teams does not push desktop notifications, a strange feature to be missing in an instant messenging app. [This maybe fixed in the future](https://microsoftteams.uservoice.com/forums/555103-public/suggestions/18671746-browser-os-independent-desktop-notifications-using#{toggle_previous_statuses}) but in the mean time this extension should do the job.
 
